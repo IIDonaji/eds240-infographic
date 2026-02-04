@@ -1,3 +1,6 @@
+# ignore any folder named `data/`
+data/
+
 # History files
 .Rhistory
 .Rapp.history

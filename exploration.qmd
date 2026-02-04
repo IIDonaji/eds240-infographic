@@ -1,0 +1,20 @@
+---
+title: "FPM #2: Exploratory Data Visualization"
+format: html
+editor: visual
+---
+
+## 
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+
+```{r}
+
+calbat_filteres <- read_csv(here("data","observations-filtered.csv"))
+```
+
