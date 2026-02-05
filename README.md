@@ -1,4 +1,4 @@
-# Creating a data-driven infographic for Bat Consrvation
+# Creating a data-driven infographic for Bat Consrvation 
 Final Project for Data Viz course
 
 # Learning Goals
@@ -13,4 +13,7 @@ Final Project for Data Viz course
 
 # Infographic Goal
 
-To spread awareness, knowledge, and understand the importance a unpopular species of bat in urban communities.
+
+About the Data:
+
+Observation data was query from iNaturalis [Calbat project](https://www.inaturalist.org/projects/calbats) and filter with the following options .. which reduce observations from 1861 to 240. 

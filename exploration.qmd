@@ -1,20 +1,165 @@
 ---
 title: "FPM #2: Exploratory Data Visualization"
-format: html
+author: "Ixel M."
+description: "Assigned Wed 01/28/2026 | Due Wed 02/04/2026"
 editor: visual
+format: 
+  pdf: 
+    echo: true
+    embed-resources: true
+execute: 
+  warning: false
+  message: false 
 ---
-
-## 
-
+IV. Import & wrangle data, then create exploratory data viz
 ```{r}
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                                    Setup                                 ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#.........................load libraries.........................
 library(tidyverse)
 library(here)
-library(janitor)
+library(lubridate)
+
+#..........................import data...........................
+
+calbats <- read_csv(here("data", "observations-675568.csv"))
+
 ```
 
 
 ```{r}
+#| output: false 
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                          Data wrangling / cleaning                       ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-calbat_filteres <- read_csv(here("data","observations-filtered.csv"))
+# iNaturalist data quick check
+glimpse(calbats)
+summary(calbats)
+
+# check for issues
+colSums(is.na(calbats))
+
+# check quality grade column
+table(calbats$quality_grade) # 993 research grade
+
+# how many observations will be lost with cleaning for research grade only
+calbats %>% 
+  filter(
+    quality_grade == "research",
+    captive_cultivated == FALSE,
+    !is.na(latitude),
+    !is.na(longitude),
+    !is.na(observed_on)
+  ) %>% 
+  nrow() # only miss 2
+
+# simple clean data for exploration
+bats_clean <- calbats %>% 
+ filter(
+    captive_cultivated == FALSE,
+    # remove NAs
+    !is.na(latitude),
+    !is.na(longitude),
+    !is.na(observed_on)
+    ) %>% 
+  mutate(
+    date = ymd(observed_on),
+    year = year(date),
+    month = month(date, label = TRUE, abbr = FALSE)
+  )
+
 ```
 
+
+```{r}
+#| fig-height: 5
+#| fig-width: 8
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                             Data visualization                           ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Plot 1: temporal patterns peak seasons/months
+ggplot(bats_clean, aes(x = month)) +
+  geom_bar() +
+  labs(title = "When are bats observed?",
+       x = "Month", y = "Number of observations")
+
+# Plot 2: years with more observations
+ggplot(bats_clean, aes(x = year)) +
+  geom_bar() +
+  labs(title = "Observations by year",
+       x = "Year", y = "Number of observations")
+# spatial patterns
+library(sf)
+
+# Convert to spatial object
+bats_sf <- st_as_sf(bats_clean, coords = c("longitude", "latitude"), crs = 4326)
+
+# Plot 3
+ggplot(bats_sf) +
+  geom_sf(alpha = 0.5) +
+  labs(title = "Where are bats being spotted?") 
+
+# Plot 4: by quality grade to show citizen science engagement
+bats_clean %>%
+  count(scientific_name, quality_grade) %>%
+  group_by(quality_grade) %>%
+  slice_max(n, n = 10) %>%
+  ggplot(aes(x = n, y = reorder(scientific_name, n), fill = quality_grade)) +
+  geom_col() +
+  labs(title = "Species diversity across observation quality",
+       x = "Observations", y = NULL)
+
+```
+
+# Check temporal and seasonal patterns as a table
+```{r}
+table(bats_clean$year) # 2017-2020 sweet spot
+table(bats_clean$month) # April peak (149)
+```
+
+# Creating an urban data to see if can focus on this topic
+```{r}
+#| output: false 
+# Extract city patterns
+bats_clean %>%
+  filter(!is.na(place_guess)) %>%
+  count(place_guess, sort = TRUE) %>%
+  print(n = 30)
+
+# filter to urban manualy 
+bats_urban <- bats_clean %>%
+  filter(str_detect(place_guess, 
+                    regex("Los Angeles|San Diego|San Francisco|Sacramento|Oakland|
+                           San Jose|Santa Rosa|Berkeley|Fresno|Long Beach|
+                           Riverside|Anaheim|Santa Cruz|Mill Valley", 
+                          ignore_case = TRUE)))
+```
+
+
+```{r}
+# Is there still enough species diversity?
+bats_urban %>% count(scientific_name, sort = TRUE) 
+
+# Is there still Enough temporal pattern?
+table(bats_urban$month) # April still peaks
+```
+# V. Answer questions
+After completing the above steps, answer the following questions:
+
+1. What have you learned about your data? Have any potentially interesting patterns emerged? Point to specific visualizations that you created as you describe your findings.
+
+  Plot 1: The month observation plot shows a very high peak in April and then peaks again in August. Something about early spring and late summer influences people to encounter/ observe more bats.
+  Plot 2: Observation peaked in 2017-2019, with sparse data before 2014 and a drop after 2020. I might decision to focus on observations from 2015 to 2025 since it has clearer distributions.   
+  Plot 3: Shows that most observation are spread across the coast lines with dense clusters in Northern California and Southern California this make sense because large cities like San Francisco and Los Angeles have more people living in them.This helps to see if I could target my data to urban communities.   
+  
+2. In FPM #1, you outlined some questions that you wanted to answer using these data. Have you made any strides towards answering those questions? If yes, how so? If no, what next steps do you need to take (e.g. I need to create X plot type, I still need to track down Y data, I need to restructure existing data so that you can visualize it in Z ways, etc.)? Have any new questions emerged?
+  
+  My data comes from citizen science observations(1,843 observations). While bats are found statewide, based on my goal I want to focus on urban environments.I identified 278 observations across major metro areas.By doing some data wrangling and specifically filtering for big cites. I wont be able to answer ecological behaviors such as what they eat or what they are vulnerable to with this data but can try to include external facts about bat ecosystem services, conservation context, and actionable tips some how in my infographic by doing some research. What I could see with my data is what bats are present and in what areas. As well as when they are active and add a community engagement to my infographic New question I can ask focus more on what my data can provide. I can answer when they are active, is there diversity, and where there hotspots are in California or narrow to southern California.   
+  
+3. What challenges do you foresee encountering with your data? These can be data wrangling and / or visualization challenges.
+
+  One challenge I can see is if I want to target urban observation how can I confirm the area is actual urban since most large cities have natural habitats such as Regional parks. iNaturalist's `place_guess` field is inconsistent, includes everything from specific addresses to value "Los Angeles County" descriptions. Difficult to accuracy identify truly urban observation without spatial analysis tools. Filtering to urban area focus story but risk sparse visualization. Not all observations are identified to species level. Deciding whether to include/exclude these affects species diversity counts. Data concentration in 2015-2020 required data filtering. Older data was too sparse and recent data is incomplete. Visualization challenges; how to balance species diversity with citizen science participation in limited space. Multiple species needs colorblind friendly palette thats distinct. Adding external context info that inst in the data. 
