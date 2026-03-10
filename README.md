@@ -1,4 +1,4 @@
-# Creating a data-driven infographic for Bat Consrvation 
+# Create a data-driven infographic using Citizen Science Data
 Final Project for Data Viz course
 
 # Learning Goals
@@ -16,4 +16,4 @@ Final Project for Data Viz course
 
 About the Data:
 
-Observation data was query from iNaturalis [Calbat project](https://www.inaturalist.org/projects/calbats) and filter with the following options .. which reduce observations from 1861 to 240. 
+Observation data was query from iNaturalis [Calbat project](https://www.inaturalist.org/projects/calbats)

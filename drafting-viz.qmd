@@ -1,0 +1,331 @@
+---
+title: "Data Viz Draft"
+author: "Ixel M."
+description: "Assigned Wed 02/11/2026 | Due Wed 02/22/2026"
+format: 
+  pdf: 
+    echo: true
+    embed-resources: true
+execute: 
+  warning: false
+  message: false 
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Pre-planning
+
+Restate question hoping to answer in  infographic
+
+1. overarching question (overall theme)
+    What citizen science reveals about California Bats.
+    
+2. three subquestions (each will addressed in component visualizations)
+
+My questions have changed since FPM #1 because before I didnt have data but once I found data I had to modified what I could do based on the information the data provides. Updated questions are as follow;
+
+  - What species are out there?
+  - Where are bats found?
+  - When are they most active?
+
+2. The following variables will be used to answer the above questions. 
+
+My data comes from the Calbat project in iNaturalist with 1843 citizen science observation. 
+
+To answer what species are out there the following variables will be used:
+- scientific_name; species identification
+- common_name; for general audience labels instead of using scientific names. I will need to wrangle the data and relabel for clarity 
+- quality_grade; to show research vs needs_id (citizen science angle)
+- num_identification_agreements; shows community verification process
+
+To answer where bats are found:
+- latitude and longitude; geographic coordinates will need to convert to spatial objects 
+- California boundaries will need to query from `tigris` package
+- place_guess; location context
+
+To answer when bats are most active:
+- observed_on; observation dates
+  Will need to extract month for seasonal pattern and year for filtering 
+
+May also need:
+- user_login; to count unique observers 
+- id; total observation count
+
+3. The following images have elemts that I will borrow for my visualizations
+
+The figure below has a nice layout. I also plan to make a map plot. I feel like it will takes a lot space and this gives me an idea on how I can arrange my plots I also like the bar plots which have a lot of annotations on them but are not disturbing. Gives me some idea on how I can add information without being overwhelming. 
+```{r}
+#| eval: true
+#| echo: false
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-alt: "Alt text here"
+knitr::include_graphics(here::here("images","layoutinspo.png")) 
+```
+On the plot below I like how they used bat symbols to indicate which bats are sensitive to white-nose syndrome, used like some type of legend design. It can be something I can use on my species plot.  
+```{r}
+#| eval: true
+#| echo: false
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-alt: "Alt text here"
+knitr::include_graphics(here::here("images", "batemojies.png"))
+```
+
+IV. Hand-drawn anticipated visualization
+```{r}
+#| eval: true
+#| echo: false
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-alt: "Alt text here"
+knitr::include_graphics(here::here("images", "sketch.jpg"))
+```
+
+
+V. Recreated hand-drawn visualization using code
+
+```{r}
+#| output: false 
+#.........................load libraries.........................
+library(tidyverse)
+library(here)
+library(lubridate)
+library(sf)
+library(tigris)
+options(tigris_use_cache = TRUE)
+#..........................import data...........................
+
+calbats <- read_csv(here("data", "observations-675568.csv"))
+
+# clean data 1018
+
+bats_clean <- calbats %>% 
+ filter(
+    captive_cultivated == FALSE,
+    # remove NAs
+    !is.na(latitude),
+    !is.na(longitude),
+    !is.na(observed_on)
+    ) %>% 
+  mutate(
+    date = ymd(observed_on),
+    year = year(date),
+    month = month(date, label = TRUE, abbr = FALSE),
+# Relabel entries to reduce diversity count inflation (not all species have common names) 
+    common_name = case_when(
+    scientific_name == "Myotis"           ~ "Unidentified Mouse-eared Bat",
+    scientific_name == "Vespertilionidae" ~ "Unidentified Evening Bat",
+    scientific_name == "Vespertilionoidea"~ "Unidentified Vespertilionoid Bat",
+    scientific_name == "Chiroptera"       ~ "Unidentified Bat",
+    TRUE ~ common_name  # Keep all other common names as-is
+  ))
+
+# verify relabeling
+bats_clean %>%
+  filter(str_detect(common_name, "Unidentified")) %>%
+  count(common_name)
+
+# Top 10 by observation count
+bats_clean %>%
+  count(common_name, sort = TRUE) %>%
+  print(n = 10)
+
+# Percentage identified to species level
+identified <- bats_clean %>%
+  filter(!str_detect(common_name, "Unidentified")) %>%
+  nrow() # 1187 unidentified
+
+identified / nrow(bats_clean) * 100  # 64% Percentage
+
+# Total unique observers by users
+length(unique(bats_clean$user_login)) # 975
+
+# Year range 
+range(bats_clean$year, na.rm = TRUE) # 1998-2025
+```
+
+
+```{r}
+#| fig-asp: 1
+# Plot 1
+# Prepare top species data
+top_species <- bats_clean %>%
+  count(common_name, sort = TRUE) %>%
+  slice_max(n, n = 10) %>%
+  mutate(
+    identified = !str_detect(common_name, "Unidentified"), # Create TRUE/FALSE column
+    common_name = fct_reorder(common_name, n)
+  ) %>% 
+ggplot(aes(x = n, y = common_name, fill = identified)) +
+  geom_col(alpha = 0.9) +
+  scale_x_continuous(limits = c(0,300)) +  
+  scale_fill_manual(
+    values = c("FALSE" = "#E0ECF4", "TRUE" = "#8856A7"),  # "#E0ECF4" "#9EBCDA" "#8856A7"
+    labels = c("Awaiting ID", "Identified to species"),
+    name = NULL
+  ) +
+  labs(
+    title = "Most documented Bat Species in California",
+    subtitle = "Top 10 most observed species/groups",
+    x = "Number of observations",
+    y = NULL,
+    caption = "64% of observations identified to species level"
+  )  +
+   theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0),
+    plot.subtitle = element_text(size = 11, color = "gray30"),
+    plot.caption = element_text(size = 9, hjust = 0, color = "gray50"),
+    legend.position = "top",
+    panel.grid.major.y = element_blank(),      # Remove horizontal gridlines
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(size = 10)
+  )
+#ggsave(filename = here::here("images","top_species.png"), plot = top_species)
+```
+
+```{r}
+#| fig-asp: 1
+# Plot 2
+
+# STEP 1: Get California boundary
+ca <- states() %>% 
+  filter(NAME == "California")
+
+# STEP 2: Extract coordinates (for hexbin layer)
+bats_coords <- bats_clean %>%
+  filter(!is.na(latitude), !is.na(longitude))
+
+# STEP 3: Create the map
+plot2 <- ggplot() +
+  
+  # LAYER 1: California state fill (light background)
+  geom_sf(data = ca, fill = "gray95", color = "gray40", linewidth = 0.5) +
+  
+  # LAYER 2: Hexagonal bins showing observation density
+  geom_hex(
+    data = bats_coords,
+    aes(x = longitude, y = latitude),
+    bins = 65,           # Number of hexagons (lower = bigger hexes)
+    alpha = 0.8
+  ) +
+  
+  # LAYER 3: California outline on top (makes border crisp)
+  geom_sf(data = ca, fill = NA, color = "black", linewidth = 0.8) +
+#Replace geom_hex with simple points: geom_sf(data = bats_sf, color = "#8856A7", alpha = 0.4, size = 0.8)
+
+  # COLORS: Viridis palette (colorblind-friendly)
+  scale_fill_viridis_c(
+    option = "magma",
+    name = "Raw Observations",
+    direction = 1       
+  ) +
+  
+  # MAP EXTENT: Zoom to California bounds
+ # coord_sf(xlim = c(-125, -114), ylim = c(32, 42)) +
+  
+  # LABELS
+  labs(
+    title = "Bat Observaions Across California",
+    subtitle = "Hotspots of citizen science observations across the state",
+    caption = "Data: iNaturalist | 1,843 observations, 1998-2025"
+  ) +
+  
+  # THEME: Void removes axes, gridlines (clean for maps)
+  theme_void(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", margin = margin(b = 5)),
+    plot.subtitle = element_text(size = 10, color = "gray30", margin = margin(b = 10)),
+    plot.caption = element_text(size = 8, hjust = 0, color = "gray50"),
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+#ggsave(filename = here::here("images","CABat.png"), plot = plot2)
+```
+
+
+```{r}
+#| fig-asp: 1
+# Plot 3
+
+# STEP 1: Prepare monthly data
+monthly <- bats_clean %>%
+  count(month) %>%
+  mutate(month = factor(month, levels = month.name))  # Keep month order
+
+# STEP 2: Create radial chart
+plot3 <- ggplot(monthly, aes(x = month, y = n)) +
+  
+  # BARS: Radial bars from center outward
+  geom_col(fill = "#810f7c", width = 0.9) +
+  
+  # MAKE IT CIRCULAR: coord_polar converts x-axis to circle
+  coord_polar(start = -pi/12) +  # Rotate so January starts at top
+  
+  # LABELS
+  labs(
+    title = "Seasonal observation patterns throughout the year",
+    subtitle = "Peak activity in April"
+  ) +
+  
+  # THEME: Clean radial appearance
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, color = "gray30", hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray50"),
+    axis.title = element_blank(),           # Remove axis labels
+    axis.text.y = element_blank(),          # Remove radial axis numbers
+    axis.ticks = element_blank(),           # Remove tick marks
+    panel.grid.major.x = element_line(color = "#b3cde3", linewidth = 0.3),# Month dividers
+    panel.grid.major.y = element_blank(),   # Remove circular gridlines
+    panel.grid.minor = element_blank()
+  )
+#ggsave(filename = here::here("images","Seasonalobs.png"), plot = plot3)
+```
+```{r}
+# Define Northern vs Southern CA (latitude ~37° is rough dividing line)
+bats_region <- bats_clean %>%
+  mutate(region = ifelse(latitude >= 37, "Northern CA", "Southern CA"))
+
+# Top species by region
+bats_region %>%
+  group_by(region) %>%
+  count(common_name, sort = TRUE) %>%
+  slice_max(n, n = 5) %>%
+  print(n = 20)
+```
+
+VI. Answer questions 
+
+1. What are the key insights you want your infographic to communicate, and how will your design choices help highlight and support those messages?
+
+Three key insights I want my infographic to communicate; one California has diverse bat species documented through citizen science, two bats are found statewide across varied habitat, and three bats activity peaks seasonally.In general what information can we get from citizen science on bats in California. I hope that all my plots show citizen science efforts for example my species plot will have identified species and unidentified observation tells two stories, confirmed diversity and active citizen science participation even without expert verification. Showing community members are engaged. With my density plot I hope to show observation hotspots rather than just scattered points, revealing where citizen scientists are most active while showing statewide distribution.I hope that my radial temporal chart emphasizes the cyclical nature of seasonal activity, making the spring/fall peaks visually intuitive and giving me a chance to be creative in my infographic design. Headers with stat numbers in bold will communicate participation and data credibility. 
+
+2. What challenges did you encounter or anticipate encountering as you continue to build / iterate on your visualizations in R? If you struggled with mocking up any of your three visualizations, describe those challenges here.
+
+ iNaturalist's place_guess field varies wildly from specific addresses to vague county-level descriptions. Initially tried filtering to 'urban' observations but realized text matching was capturing national parks and wildlife refuges within city names. Abandoned strict urban focus in favor of honest statewide representation.Other challenges are taxonomic information about 35% of observations aren't identified to species level (genus/family only). I decided to keep these as Unidentified categories rather than exclude them, this helps with the citizen science narrative. Density plots initially didn't display CA state outline due to coordinate system conflicts between geom_sf() and stat_density_2d(). Switch to hexbin for cleaner appearance.I'm still struggling on how to better display overall observation may need to standardize observations to percentage so it can look cleaner.
+
+3. What ggplot extension tools / packages do you need to use to build your visualizations? Are there any that we haven’t covered in class that you’ll be learning how to use for your visualizations?
+
+For now the following tools/ packages have been used.
+
+- `sf`: to convert lat/long to spatial objects
+- `tigris`: Dowloaded US Census geographic boundaries for CA state outline
+- `coord_polar()` : creating radial temporal chart
+- `stat_density_2d()` or `geom_hex`
+
+I haven't encounter packages not discussed in class that I might use.  
+
+
+4. What feedback do you need from the instructional team and / or your peers to ensure that your intended message and key insights are clear?
+
+Is the citizen science angle clear? Does distinguishing identified vs unidentified species successfully communicate community engagement, or does it just look like messy data? 
+
+Does the density/hexbin approach work, or would simple points with high transparency be clearer for showing distribution?
+
+Do the three plots together tell a coherent story, or do they feel disconnected? Should I add more text/annotations linking them?
+
+Is this accessible to non-scientists, or too technical?
