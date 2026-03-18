@@ -216,10 +216,8 @@ ggplot(monthly, aes(x = month, y = n)) +
     panel.grid.minor = element_blank()
   )
 ```
- text/typography/ color/ theme
-Where all desgined using Affinity designer 
- considering accessibility
- 
+
+## Bringing 
  Accessibility and DEIJ 
  
  
