@@ -1,5 +1,6 @@
 # ignore any folder named `data/`
 data/
+images/
 
 # History files
 .Rhistory
@@ -50,3 +51,4 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+.positai
